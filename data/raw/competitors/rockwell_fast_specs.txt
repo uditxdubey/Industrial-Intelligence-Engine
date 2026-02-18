@@ -1,0 +1,13 @@
+ROCKWELL AUTOMATION COMPACTLOGIX 5380 SPECIFICATIONS
+--------------------------------------------------
+Product: CompactLogix 5380 Controller
+Brand: Rockwell Automation / Allen-Bradley
+Voltage: 18-32V DC (Nominal 24V DC)
+Wiring:
+- Connect +24V DC to terminal V+
+- Connect DC Common to terminal V-
+- Use Copper wire only, 75°C rated.
+Communication: Dual Ethernet/IP ports.
+Programming: Studio 5000 Logix Designer.
+Difference from Siemens: Rockwell uses Ethernet/IP, Siemens uses PROFINET.
+Torque: 0.6 Nm for power terminals.

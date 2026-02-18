@@ -1,67 +1,23 @@
-import os
-import torch
-import chromadb
-from dotenv import load_dotenv
-from llama_index.core import (
-    VectorStoreIndex, 
-    SimpleDirectoryReader, 
-    StorageContext, 
-    Settings
-)
-from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+import chromadb #local database for AI: stores numbers(vectors) instead of text
+from llama_index.vector_stores.chroma import ChromaVectorStore #bridge that allows LlamaIndex to communicate with ChromaDB
+from llama_index.core import VectorStoreIndex, StorageContext#suitcase that holds the vector stores
 
-# Load environment variables (like your LlamaCloud key if needed)
-load_dotenv()
+def get_vector_store_context(collection_name, path="./chroma_db"): #used by ingest_split.py . it prepares the database to receive new data
+    
+    db = chromadb.PersistentClient(path=path)#connect to the local ChromaDB instance. If it doesn't exist, it will create a new one at the specified path.
+    
+    # get_or_create ensures we can add to it if it exists, or make a new one,preventing data bleed so the agents cant see each other as they are in different collection
+    chroma_collection = db.get_or_create_collection(collection_name)
+    
+    vector_store = ChromaVectorStore(chroma_collection=chroma_collection)#formatting the chroma collection for LLamaIndex to understand. It acts as a translator between the two systems.
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)#suitcase
+    
+    return storage_context
 
-def create_memory():
-    print("--- Starting Phase 2: Building Vector Memory ---")
-
-    # 1. M2 ACCELERATION LOGIC
-    # This uses the M2 GPU (Metal) instead of the CPU
-    if torch.backends.mps.is_available():
-        device = "mps"
-        print("🚀 M2 GPU (Metal) detected! Using MPS for high-speed indexing.")
-    else:
-        device = "cpu"
-        print("🐢 Using CPU for indexing.")
-
-    # 2. LOCAL EMBEDDING SETTINGS
-    # We use a local model and disable OpenAI to avoid "No API Key" errors
-    Settings.embed_model = HuggingFaceEmbedding(
-        model_name="BAAI/bge-small-en-v1.5",
-        device=device
-    )
-    Settings.llm = None  # Prevents LlamaIndex from looking for OpenAI during this step
-
-    # 3. DATABASE INITIALIZATION
-    # This creates the 'chroma_db' folder in your project root
-    db = chromadb.PersistentClient(path="./chroma_db")
-    chroma_collection = db.get_or_create_collection("siemens_s71200")
-
-    # 4. VECTOR STORE CONFIGURATION
+def load_index_from_disk(collection_name, path="./chroma_db"):#used by app.py to load the specific index for router
+    
+    db = chromadb.PersistentClient(path=path)
+    chroma_collection = db.get_collection(collection_name)#using get; makes sure that the ai crashes before using a ghost query and hallucinate
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
-    # 5. LOADING DATA
-    # This reads the 'parsed_manual.md' file you generated earlier
-    print("Reading your parsed Siemens manual...")
-    if not os.path.exists("./data/parsed_manual.md"):
-        print("❌ Error: ./data/parsed_manual.md not found! Run ingest.py first.")
-        return
-
-    documents = SimpleDirectoryReader("./data").load_data()
-
-    # 6. CREATING THE INDEX (THE "BRAIN")
-    print("Indexing documents... This may take a minute on your M2.")
-    index = VectorStoreIndex.from_documents(
-        documents, 
-        storage_context=storage_context,
-        show_progress=True
-    )
-
-    print("\n✅ SUCCESS: Local Vector Database created in /chroma_db")
-    return index
-
-if __name__ == "__main__":
-    create_memory()
+    
+    return VectorStoreIndex.from_vector_store(vector_store)#rerouting the index
