@@ -1,67 +1,137 @@
--- Industrial Agentic RAG: Zero-Hallucination Router-Based Multi-Agent System--
+# Industrial Intelligence Engine
 
-Descrption : An intelligent, multi-agent Retrieval-Augmented Generation (RAG) system designed to query and compare industrial automation manuals (Siemens vs. Rockwell) without data bleeding or hallucination.
+> Zero-hallucination multi-agent RAG for industrial automation manuals. Siemens vs Rockwell — without data bleeding.
 
-The Evolution: From Single-Agent to Multi-Agent Router
-This project started as a standard flat RAG querying a single Siemens PDF. However, in industrial automation, asking a generic AI to compare two different brands often leads to dangerous hallucinations (e.g., mixing up voltage terminals).
+![Python](https://img.shields.io/badge/python-3.9+-blue)
+![LLM](https://img.shields.io/badge/LLM-Llama%203.3%2070B-orange)
+![Embeddings](https://img.shields.io/badge/embeddings-BAAI%2Fbge--small--en-green)
+![VectorDB](https://img.shields.io/badge/vectordb-ChromaDB-red)
+![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
-The Solution: I migrated the architecture to a Semantic Multi-Agent Router.
-Instead of one massive database, the system uses an LLM to analyze the user's intent and route the query to isolated, brand-specific Vector Databases. 
+## The Problem
 
+In industrial automation, a generic RAG system querying multiple vendor manuals produces dangerous hallucinations — mixing Siemens voltage specs with Rockwell terminal configurations. A single wrong answer can cause equipment failure.
 
+Standard flat RAG has no concept of vendor isolation. It retrieves from everything and lets the LLM blend it. That is unacceptable in a production industrial environment.
 
-  System Architecture & Flow
-1.User Query: Entered via Streamlit UI.
-2. Agentic Router (Groq Llama 3.3 70B): Analyzes the prompt and selects the appropriate sub-agent(s) based on tool descriptions.
-3. Hybrid Ingestion & Retrieval:
- -Siemens Agent: Queries a vector store built from complex PDFs parsed via cloud-based LlamaParse.
--Rockwell Agent: Queries a localized vector store built from raw text files to optimize speed and API costs.
-4. Synthesis & Transparency: The LLM combines the retrieved facts and displays the final answer alongside a JSON "Reasoning Trace" so engineers can verify the sources.
+## The Solution
 
-Challenges & Debugging
-Building a multi-agent system locally presented several unique challenges: 
-1.Encountered ModuleNotFoundError for libraries like llama-index-llms-ollama or llama-parse, even after a terminal installation.
--Fix: Verified the active Conda environment (agentic_rag) and ensured the VS Code Python Interpreter was explicitly set to the Conda environment path to link the "Brain".
+A **Semantic Multi-Agent Router** that never lets vendor data cross-contaminate.
 
-1.Model Deprecation Crashes: Encountered `model_decommissioned` and `model_not_found` errors when Groq retired the Llama 3 70B `8192` tag. 
--Fix: Debugged API endpoints and migrated the routing engine to the updated `llama-3.3-70b-versatile` standard.
-2.Vector Dimension Mismatches: Mixing OpenAI embeddings for cloud parsing with HuggingFace for local parsing corrupted the comparison logic. 
--Fix: Forced global initialization of the local `BAAI/bge-small-en-v1.5` embedding model across all ingestion and retrieval scripts.
-3.Cost & Latency Management:** Parsing large technical PDFs drained cloud API limits quickly. 
--Fix: Implemented a conditional routing pipeline in `ingest_split.py` to handle heavy PDFs via Cloud and lightweight competitor text files via local zero-cost processing.
+Instead of one vector database, each vendor gets an isolated store. An LLM router analyzes the user's intent and dispatches to the correct sub-agent — or both, when a comparison is explicitly requested.
 
-  --How to Run Locally--
-1. Clone the repository:
-git clone [https://github.com/uditxdubey/Industrial-Agentic-RAG.git](https://github.com/uditxdubey/Industrial-Agentic-RAG.git)
-cd Industrial-Agentic-RAG
+```
+User Query
+    │
+    ▼
+┌─────────────────────────────────┐
+│  Agentic Router                 │
+│  Groq Llama 3.3 70B             │
+│  Classifies intent → routes     │
+└──────────┬──────────────┬───────┘
+           │              │
+     SIEMENS             ROCKWELL
+           │              │
+           ▼              ▼
+┌──────────────┐  ┌──────────────┐
+│ Siemens      │  │ Rockwell     │
+│ Vector Store │  │ Vector Store │
+│ (ChromaDB)   │  │ (ChromaDB)   │
+└──────┬───────┘  └──────┬───────┘
+       │                 │
+       └────────┬────────┘
+                ▼
+     LLM Synthesis + Reasoning Trace
+                │
+                ▼
+        Streamlit UI Answer
+```
 
-2. Create a virtual environment (Recommended):
+## Architecture Decisions
+
+### Hybrid Ingestion Pipeline
+Two data sources, two ingestion strategies — chosen for cost and quality:
+
+| Source | Format | Ingestion Method | Reason |
+|--------|--------|-----------------|--------|
+| Siemens | Complex PDFs with tables | LlamaParse (Cloud) | Preserves tabular structure critical for specs |
+| Rockwell | Text specifications | Local parsing | Zero API cost, sufficient for plain text |
+
+### Standardized Vectorization
+Both pipelines converge on the same local embedding model — `BAAI/bge-small-en-v1.5` via HuggingFace. This eliminates embedding dimension mismatches and removes OpenAI embedding costs entirely.
+
+### Explainable Routing
+Every answer surfaces a JSON Reasoning Trace in the UI — showing exactly which database was queried, why, and what was retrieved. Engineers can verify the source before acting on the output.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| LLM / Router | Groq — Llama 3.3 70B Versatile |
+| PDF Parsing | LlamaParse (Cloud API) |
+| Embeddings | BAAI/bge-small-en-v1.5 (local, HuggingFace) |
+| Vector Store | ChromaDB (local, isolated collections) |
+| UI | Streamlit |
+| Language | Python |
+
+## Quickstart
+
+```bash
+# 1. Clone
+git clone https://github.com/uditxdubey/Industrial-Intelligence-Engine.git
+cd Industrial-Intelligence-Engine
+
+# 2. Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-3. Install dependencies:
+# 3. Install dependencies
 pip install -r requirements.txt
 
-4. Set up the environment variables
-Create a .env file in the root directory and add your API keys:
-GROQ_API_KEY=#enter your personal key here for groq
-LLAMA_CLOUD_API_KEY=#enter your key here for LLama Cloud
+# 4. Set environment variables
+cp .env.example .env
+# Add your keys:
+# GROQ_API_KEY=your_key
+# LLAMA_CLOUD_API_KEY=your_key
 
-5. Run the Application
+# 5. Ingest documents
+python ingest_split.py
+
+# 6. Run
 streamlit run app.py
+```
 
-My Notes:
-The Goal: Build a "Zero-Hallucination" AI assistant for industrial automation engineers to query and compare complex hardware manuals (Siemens vs. Rockwell) without cross-brand data contamination.
+## Example Queries
 
-The Local-First Attempt (Privacy Focus): Initially deployed the system entirely locally using Ollama (Llama 3) on an M2 MacBook to guarantee complete data privacy. While secure, inference latency was too high for a production-grade user experience.
+```
+"What is the maximum input voltage for Siemens S7-1500?"
+→ Routes to Siemens agent only
 
-The Hybrid Architecture Pivot: Shifted to a split computing model. Offloaded the heavy LLM reasoning to the cloud using Groq (Llama-3.3-70b-versatile) for near-instant inference, while maintaining control over the data layer.
+"Compare Rockwell and Siemens safety relay wiring requirements"
+→ Routes to both agents, synthesizes comparison
 
-Cost-Optimized Data Ingestion: Engineered a dual-path ingestion pipeline. Complex Siemens PDFs were routed through LlamaParse (Cloud API) to preserve tabular data, while simple Rockwell text specs were parsed locally to conserve API credits.
+"What are the Rockwell terminal torque specifications?"
+→ Routes to Rockwell agent only
+```
 
-Standardized Local Vectorization: Forced both data streams through a local HuggingFace embedding model (BAAI/bge-small-en-v1.5). This eliminated embedding costs and standardized the vectors before saving them to isolated collections in a local ChromaDB instance.
+## Why This Matters
 
-The Agentic Router Upgrade: Replaced the flat RAG architecture with an intelligent Semantic Router. The Groq LLM now acts as a manager, analyzing the user's intent and dynamically dispatching queries to the isolated Siemens and/or Rockwell vector stores.
+Generic LLM assistants cannot be trusted in industrial environments where wrong answers have physical consequences. This system enforces vendor isolation at the data layer — not at the prompt layer — making hallucination structurally impossible across vendor boundaries.
 
-Explainable UI Verification: Wrapped the backend in a Streamlit interface featuring a "Reasoning Trace" expander. This exposes the router's JSON decision-making process, proving to the user exactly which database was queried and why.
+## Project Structure
 
+```
+Industrial-Intelligence-Engine/
+├── app.py                  # Streamlit UI + agent orchestration
+├── ingest_split.py         # Hybrid ingestion pipeline
+├── src/                    # Agent logic and router
+│   └── ...
+├── data/
+│   └── raw/                # Source manuals (PDFs + text)
+└── requirements.txt
+```
+
+## Built By
+
+Udit Naresh Dubey — Master's in Data Science, FAU Erlangen-Nürnberg  
+[LinkedIn](https://www.linkedin.com/in/udit-dubey) · [GitHub](https://github.com/uditxdubey)
