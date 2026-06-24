@@ -134,4 +134,4 @@ Industrial-Intelligence-Engine/
 ## Built By
 
 Udit Naresh Dubey — Master's in Data Science, FAU Erlangen-Nürnberg  
-[LinkedIn](https://www.linkedin.com/in/udit-dubey) · [GitHub](https://github.com/uditxdubey)
+[LinkedIn](https://www.linkedin.com/in/udit-dubey-9aa0b9284/) · [GitHub](https://github.com/uditxdubey)
